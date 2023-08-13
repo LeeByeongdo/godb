@@ -1,13 +1,10 @@
-package main
+package ch1
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 )
-
-func main() {
-	fmt.Println("Hello, World!")
-}
 
 // 문제1. 파일을 쓰기 전에 항상 파일을 비운다. 만약 동시에 파일을 읽으려고 하면 어떻게 될까?
 // 문제2. 파일 사이즈에 따라 파일이 한 번에 쓰여지지 않을 수 있다. 중간에 읽으려고 시도하면 완전하지 않은 데이터가 읽힌다.
@@ -28,4 +25,66 @@ func saveData1(path string, data []byte) error {
 
 	_, err = fp.Write(data)
 	return err
+}
+
+func saveData2(path string, data []byte) error {
+	// os.O_EXCL 없는 파일일 경우 생성, 이미 파일이 존재하는 경우 에러
+	tmp := fmt.Sprintf("%s.tmp.%d", path, rand.Int31())
+	fp, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0664)
+	if err != nil {
+		return err
+	}
+
+	// defer는 해당 스코프가 종료되기 전에 실행된다. finally 의 역할과 비슷하다.
+	// 여기서는 파일이 사용이 완료되든, 중간에 에러가 나든 항상 close 될 수 있도록 한다.
+	defer fp.Close()
+
+	_, err = fp.Write(data)
+	if err != nil {
+		os.Remove(tmp)
+		return err
+	}
+
+	return os.Rename(tmp, path)
+}
+
+func saveData3(path string, data []byte) error {
+	// os.O_EXCL 없는 파일일 경우 생성, 이미 파일이 존재하는 경우 에러
+	tmp := fmt.Sprintf("%s.tmp.%d", path, rand.Int31())
+	fp, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0664)
+	if err != nil {
+		return err
+	}
+
+	// defer는 해당 스코프가 종료되기 전에 실행된다. finally 의 역할과 비슷하다.
+	// 여기서는 파일이 사용이 완료되든, 중간에 에러가 나든 항상 close 될 수 있도록 한다.
+	defer fp.Close()
+
+	_, err = fp.Write(data)
+	if err != nil {
+		os.Remove(tmp)
+		return err
+	}
+
+	err = fp.Sync()
+	if err != nil {
+		os.Remove(tmp)
+		return err
+	}
+
+	return os.Rename(tmp, path)
+}
+
+func LogCreate(path string) (*os.File, error) {
+	return os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0664)
+}
+
+func LogAppend(fp *os.File, line string) error {
+	buf := []byte(line)
+	buf = append(buf, '\n')
+	_, err := fp.Write(buf)
+	if err != nil {
+		return err
+	}
+	return fp.Sync()
 }
